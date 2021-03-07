@@ -1,0 +1,6 @@
+server:
+  port: 8888
+terraform:
+  token:
+    type: Bearer
+    value: your-bearer-token
