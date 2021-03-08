@@ -11,7 +11,7 @@ import (
 func main() {
 	appConfig := config.Load()
 	router := mux.NewRouter()
-	registerHandler(router)
+	registerHandler(router, appConfig)
 	startServer(router, appConfig.Server.Port)
 }
 

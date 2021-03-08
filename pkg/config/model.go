@@ -18,6 +18,5 @@ type TerraformConfig struct {
 
 // TokenConfig terraform cloud token authorization
 type TokenConfig struct {
-	Type  string `yaml:"type"`
-	Value string `yaml:"value"`
+	Bearer string `yaml:"bearer"`
 }
