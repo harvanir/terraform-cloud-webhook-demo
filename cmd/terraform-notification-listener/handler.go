@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/sirupsen/logrus"
 	"harvanir/terraform-cloud-webhook-demo/pkg/config"
-	"harvanir/terraform-cloud-webhook-demo/pkg/rest-api/notification"
+	"harvanir/terraform-cloud-webhook-demo/pkg/rest_api/notification"
 	"net/http"
 )
 

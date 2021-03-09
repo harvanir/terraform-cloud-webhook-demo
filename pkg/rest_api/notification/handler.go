@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"harvanir/terraform-cloud-webhook-demo/pkg/json"
-	"harvanir/terraform-cloud-webhook-demo/pkg/rest-api/common"
+	"harvanir/terraform-cloud-webhook-demo/pkg/rest_api/common"
 	"net/http"
 )
 
@@ -53,7 +53,7 @@ func (ctx *Context) Notification(rw http.ResponseWriter, r *http.Request) {
 }
 
 func writeErrorResponse(rw http.ResponseWriter) {
-	handler.WriteResponse([]byte("{\"message\":\"error\"}"), rw)
+	handler.WriteJsonResponse([]byte("{\"message\":\"error\"}"), rw)
 }
 
 func isRunStatusApplied(notifications []Notification) bool {
@@ -64,15 +64,15 @@ func writeDefaultResponse(v interface{}, rw http.ResponseWriter) {
 	byteArr, err := json.Marshal(v)
 	if err != nil {
 		logrus.Error(fmt.Errorf("failed marshal to bytes: %w", err))
-		handler.WriteResponse([]byte("{\"message\":\"error\"}"), rw)
+		handler.WriteJsonResponse([]byte("{\"message\":\"error\"}"), rw)
 		return
 	}
-	handler.WriteResponse(byteArr, rw)
+	handler.WriteJsonResponse(byteArr, rw)
 	logrus.Info("writing object: \n", string(byteArr))
 }
 
 func writeResponse(byteArr []byte, rw http.ResponseWriter) {
-	handler.WriteResponse(byteArr, rw)
+	handler.WriteJsonResponse(byteArr, rw)
 	logrus.Info("writing object: \n", string(byteArr))
 }
 
