@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 )
 
+const configName = "config.yml"
+
 // Load load config from file
 func Load() *AppConfig {
 	appConfig := &AppConfig{}
-	bytes, err := ioutil.ReadFile("config.yml")
+	bytes, err := ioutil.ReadFile(configName)
 	if err != nil {
 		logrus.Fatal("failed when read file: %w", err)
 	}

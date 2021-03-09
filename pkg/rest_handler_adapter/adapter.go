@@ -1,4 +1,4 @@
-package main
+package rest_handler_adapter
 
 import (
 	"github.com/sirupsen/logrus"

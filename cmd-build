@@ -1,2 +1,2 @@
 #!/bin/sh
-go build -o bin/main cmd/terraform-notification-listener/*
+go build -o bin/main cmd/notification-listener/*

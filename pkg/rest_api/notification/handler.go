@@ -26,30 +26,38 @@ func (ctx *Context) Notification(rw http.ResponseWriter, r *http.Request) {
 		writeDefaultResponse(&payload, rw)
 		return
 	}
+	downloadURLResponse, ok := callTerraform(rw, ctx, payload)
+	if !ok {
+		return
+	}
+	writeNotificationResponse(downloadURLResponse, rw)
+}
+
+func callTerraform(rw http.ResponseWriter, ctx *Context, payload Payload) (*HostedStateDownloadURLResponse, bool) {
 	// call run apply webhook to get state version
 	runApplyResponse, ok := callRunApplyWebhook(ctx, payload.RunID, rw)
 	if !ok {
-		return
+		return nil, false
 	}
 	stateVersionData := runApplyResponse.Data.Relationships.StateVersions.Data
 	if len(stateVersionData) == 0 {
 		writeErrorResponse(rw)
-		return
+		return nil, false
 	}
 	// call state version webhook to get created ip public
 	stateVersionResponse, ok := callStateVersionWebhook(stateVersionData[0].ID, ctx, rw)
 	if !ok {
 		writeErrorResponse(rw)
-		return
+		return nil, false
 	}
 	// call hosted state download url
 	hostedStateDownloadURL := stateVersionResponse.Data.Attributes.HostedStateDownloadURL
 	hostedStateDownloadURLResponse, ok := callHostedStateDownloadURL(hostedStateDownloadURL, ctx, rw)
 	if !ok {
 		writeErrorResponse(rw)
-		return
+		return nil, false
 	}
-	writePublicIP(hostedStateDownloadURLResponse, rw)
+	return hostedStateDownloadURLResponse, true
 }
 
 func writeErrorResponse(rw http.ResponseWriter) {
@@ -192,16 +200,17 @@ func decodeTextResponse(response interface{}, httpResponse *http.Response, rw ht
 	return true
 }
 
-func writePublicIP(hostedStateDownloadURLResponse *HostedStateDownloadURLResponse, rw http.ResponseWriter) {
-	hostedStateResources := hostedStateDownloadURLResponse.Resources
-	funcBool := func(t []HostedStateDownloadURLResource) bool {
-		return len(t[0].Instances) == 0
-	}
-	if len(hostedStateResources) == 0 || funcBool(hostedStateResources) {
+func writeNotificationResponse(downloadURLResponse *HostedStateDownloadURLResponse, rw http.ResponseWriter) {
+	resources := downloadURLResponse.Resources
+	if isValidResources(resources) {
 		writeErrorResponse(rw)
 	}
-	hostedStateResource := hostedStateResources[0]
+	hostedStateResource := resources[0]
 	hostedStateInstances := hostedStateResource.Instances
 	publicIP := []byte(fmt.Sprintf(`{"public_ip":"%v"}`, hostedStateInstances[0].Attributes.PublicIP))
 	writeResponse(publicIP, rw)
+}
+
+func isValidResources(resources []HostedStateDownloadURLResource) bool {
+	return len(resources) == 0 || len(resources[0].Instances) == 0
 }
