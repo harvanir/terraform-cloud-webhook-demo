@@ -20,7 +20,7 @@ func Load() *AppConfig {
 	if err != nil {
 		logrus.Fatal("failed when unmarshall: %w", err)
 	}
-	if appConfig.Terraform.Token.Bearer == "" {
+	if appConfig.Terraform.Token.Value == "" {
 		logrus.Fatal("no token found")
 	}
 	return appConfig

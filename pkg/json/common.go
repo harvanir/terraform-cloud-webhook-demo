@@ -23,3 +23,7 @@ func Marshal(v interface{}) ([]byte, error) {
 func Unmarshal(source string, v interface{}) error {
 	return json.Unmarshal([]byte(source), v)
 }
+
+func UnmarshalByte(bytes []byte, v interface{}) error {
+	return json.Unmarshal(bytes, v)
+}

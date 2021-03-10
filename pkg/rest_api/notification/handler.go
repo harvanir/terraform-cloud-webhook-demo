@@ -1,8 +1,9 @@
 package notification
 
 import (
-	"bytes"
+	"context"
 	"fmt"
+	"github.com/hashicorp/go-tfe"
 	"github.com/sirupsen/logrus"
 	"harvanir/terraform-cloud-webhook-demo/pkg/json"
 	"harvanir/terraform-cloud-webhook-demo/pkg/rest_api/common"
@@ -10,8 +11,7 @@ import (
 )
 
 const (
-	runApplyAPI     = "https://app.terraform.io/api/v2/runs/%v/apply"
-	stateVersionAPI = "https://app.terraform.io/api/v2/state-versions/%v"
+	runApplyAPI = "https://app.terraform.io/api/v2/runs/%v/apply"
 )
 
 // Handler handle notification API
@@ -34,6 +34,15 @@ func (ctx *Context) Notification(rw http.ResponseWriter, r *http.Request) {
 }
 
 func callTerraform(rw http.ResponseWriter, ctx *Context, payload Payload) (*HostedStateDownloadURLResponse, bool) {
+	// tfe context
+	tfeContext := context.Background()
+	config := &tfe.Config{Token: ctx.Config.Terraform.Token.Value}
+	client, err := tfe.NewClient(config)
+	if err != nil {
+		logrus.Error("error new tfe client: ", err)
+		writeErrorResponse(rw)
+		return nil, false
+	}
 	// call run apply webhook to get state version
 	runApplyResponse, ok := callRunApplyWebhook(ctx, payload.RunID, rw)
 	if !ok {
@@ -44,20 +53,28 @@ func callTerraform(rw http.ResponseWriter, ctx *Context, payload Payload) (*Host
 		writeErrorResponse(rw)
 		return nil, false
 	}
-	// call state version webhook to get created ip public
-	stateVersionResponse, ok := callStateVersionWebhook(stateVersionData[0].ID, ctx, rw)
-	if !ok {
+	// call state version
+	stateVersion, err := client.StateVersions.Read(tfeContext, stateVersionData[0].ID)
+	if err != nil {
+		logrus.Error("error stateVersion: ", err)
 		writeErrorResponse(rw)
 		return nil, false
 	}
-	// call hosted state download url
-	hostedStateDownloadURL := stateVersionResponse.Data.Attributes.HostedStateDownloadURL
-	hostedStateDownloadURLResponse, ok := callHostedStateDownloadURL(hostedStateDownloadURL, ctx, rw)
-	if !ok {
+	// call download
+	download, err := client.StateVersions.Download(tfeContext, stateVersion.DownloadURL)
+	if err != nil {
+		logrus.Error("error download: ", err)
 		writeErrorResponse(rw)
 		return nil, false
 	}
-	return hostedStateDownloadURLResponse, true
+	var response HostedStateDownloadURLResponse
+	err = json.UnmarshalByte(download, &response)
+	if err != nil {
+		logrus.Error("error unmarshal: ", err)
+		writeErrorResponse(rw)
+		return nil, false
+	}
+	return &response, true
 }
 
 func writeErrorResponse(rw http.ResponseWriter) {
@@ -118,81 +135,11 @@ func callRunApplyWebhook(ctx *Context, runID string, rw http.ResponseWriter) (*A
 
 func constructAuthHeader(ctx *Context, request *http.Request) {
 	token := ctx.Config.Terraform.Token
-	request.Header.Set("Authorization", token.Bearer)
-}
-
-func callStateVersionWebhook(stateVersion string, ctx *Context, rw http.ResponseWriter) (*StateVersionsResponse, bool) {
-	url := fmt.Sprintf(stateVersionAPI, stateVersion)
-	// construct http request
-	request, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		logrus.Error(fmt.Errorf("error create new http request: %w", err))
-		writeErrorResponse(rw)
-		return nil, false
-	}
-	constructAuthHeader(ctx, request)
-	httpResponse, ok := doRequest(request, rw)
-	if !ok {
-		writeErrorResponse(rw)
-		return nil, false
-	}
-	var response StateVersionsResponse
-	if ok := decodeJsonResponse(&response, httpResponse, rw); ok {
-		return &response, true
-	}
-	return nil, false
-}
-
-func callHostedStateDownloadURL(url string, ctx *Context, rw http.ResponseWriter) (*HostedStateDownloadURLResponse, bool) {
-	// construct http request
-	request, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		logrus.Error(fmt.Errorf("error create new http request: %w", err))
-		writeErrorResponse(rw)
-		return nil, false
-	}
-	constructAuthHeader(ctx, request)
-	httpResponse, ok := doRequest(request, rw)
-	if !ok {
-		writeErrorResponse(rw)
-		return nil, false
-	}
-	var response HostedStateDownloadURLResponse
-	if ok := decodeTextResponse(&response, httpResponse, rw); !ok {
-		return nil, false
-	}
-	var finalResponse HostedStateDownloadURLResponse
-	funcCast := func(v interface{}) bool {
-		hostedStateDownloadURLResource, ok := v.(HostedStateDownloadURLResponse)
-		if !ok {
-			return false
-		}
-		finalResponse = hostedStateDownloadURLResource
-		return true
-	}
-	if ok && funcCast(response) {
-		return &finalResponse, true
-	}
-	return nil, false
+	request.Header.Set("Authorization", "Bearer "+token.Value)
 }
 
 func decodeJsonResponse(v interface{}, httpResponse *http.Response, rw http.ResponseWriter) bool {
 	if err := json.Decode(v, httpResponse.Body); err != nil {
-		logrus.Error("error decode response from downstream: %w", err)
-		writeErrorResponse(rw)
-		return false
-	}
-	return true
-}
-
-func decodeTextResponse(response interface{}, httpResponse *http.Response, rw http.ResponseWriter) bool {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(httpResponse.Body)
-	if err != nil {
-		writeErrorResponse(rw)
-		return false
-	}
-	if err := json.Unmarshal(buf.String(), response); err != nil {
 		logrus.Error("error decode response from downstream: %w", err)
 		writeErrorResponse(rw)
 		return false
@@ -206,9 +153,12 @@ func writeNotificationResponse(downloadURLResponse *HostedStateDownloadURLRespon
 		writeErrorResponse(rw)
 	}
 	hostedStateResource := resources[0]
-	hostedStateInstances := hostedStateResource.Instances
-	publicIP := []byte(fmt.Sprintf(`{"public_ip":"%v"}`, hostedStateInstances[0].Attributes.PublicIP))
-	writeResponse(publicIP, rw)
+	bytes, err := json.Marshal(&hostedStateResource)
+	if err != nil {
+		logrus.Error("error marshal: ", err)
+		writeErrorResponse(rw)
+	}
+	writeResponse(bytes, rw)
 }
 
 func isValidResources(resources []HostedStateDownloadURLResource) bool {

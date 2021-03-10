@@ -2,4 +2,4 @@ server:
   port: 8888
 terraform:
   token:
-    bearer: Bearer your-bearer-token
+    token: insert-your-token-here

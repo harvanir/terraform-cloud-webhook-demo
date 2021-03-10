@@ -36,10 +36,10 @@ type Notification struct {
 }
 
 type ApplyResponse struct {
-	Data Data `json:"data"`
+	Data ApplyData `json:"data"`
 }
 
-type Data struct {
+type ApplyData struct {
 	ID            string        `json:"id"`
 	Type          string        `json:"type"`
 	Attributes    Attributes    `json:"attributes,omitempty"`
