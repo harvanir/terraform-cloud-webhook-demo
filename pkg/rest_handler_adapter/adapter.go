@@ -2,8 +2,6 @@ package rest_handler_adapter
 
 import (
 	"github.com/sirupsen/logrus"
-	"harvanir/terraform-cloud-webhook-demo/pkg/config"
-	"harvanir/terraform-cloud-webhook-demo/pkg/rest_api/notification"
 	"net/http"
 )
 
@@ -11,11 +9,8 @@ type HandlerAdapter struct {
 	NotificationHandler func(rw http.ResponseWriter, r *http.Request)
 }
 
-func NewHandlerAdapter(config *config.AppConfig) *HandlerAdapter {
-	notificationCtx := notification.NewNotificationCtx(config)
-	return &HandlerAdapter{
-		NotificationHandler: notificationCtx.Notification,
-	}
+func NewHandlerAdapter() *HandlerAdapter {
+	return &HandlerAdapter{}
 }
 
 func (handler *HandlerAdapter) Notification(rw http.ResponseWriter, r *http.Request) {

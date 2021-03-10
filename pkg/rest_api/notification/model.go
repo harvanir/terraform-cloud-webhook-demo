@@ -86,6 +86,6 @@ type HostedStateDownloadURLAttribute struct {
 	PublicIP string `json:"public_ip"`
 }
 
-func NewNotificationCtx(config *config.AppConfig) Context {
-	return Context{Config: config}
+func NewNotificationCtx(config *config.AppConfig) *Context {
+	return &Context{Config: config}
 }
